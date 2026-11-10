@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.focusquest.app.data.FocusDatabase
 import com.focusquest.app.data.TaskEntity
 import com.focusquest.app.data.TaskRepository
+import com.focusquest.app.blocker.FocusBlockerPreferences
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -59,6 +60,7 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
         if (_remainingMillis.value <= 0L) _remainingMillis.value = _selectedMinutes.value * 60_000L
         endAtMillis = System.currentTimeMillis() + _remainingMillis.value
         _isTimerRunning.value = true
+        FocusBlockerPreferences.setFocusActive(getApplication(), true, endAtMillis)
         timerJob?.cancel()
         timerJob = viewModelScope.launch {
             while (_isTimerRunning.value) {
@@ -66,6 +68,7 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
                 _remainingMillis.value = left
                 if (left == 0L) {
                     _isTimerRunning.value = false
+                    FocusBlockerPreferences.setFocusActive(getApplication(), false)
                     val minutes = _selectedMinutes.value
                     repository.addFocusSession(minutes)
                     _lastSessionXp.value = minutes * 2
@@ -80,12 +83,14 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
         if (!_isTimerRunning.value) return
         _remainingMillis.value = (endAtMillis - System.currentTimeMillis()).coerceAtLeast(0L)
         _isTimerRunning.value = false
+        FocusBlockerPreferences.setFocusActive(getApplication(), false)
         timerJob?.cancel()
     }
 
     fun resetFocus() {
         timerJob?.cancel()
         _isTimerRunning.value = false
+        FocusBlockerPreferences.setFocusActive(getApplication(), false)
         _remainingMillis.value = _selectedMinutes.value * 60_000L
         _lastSessionXp.value = null
     }
@@ -95,6 +100,7 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     override fun onCleared() {
+        FocusBlockerPreferences.setFocusActive(getApplication(), false)
         timerJob?.cancel()
         super.onCleared()
     }

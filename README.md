@@ -72,3 +72,8 @@ Nesta versão, o timer permanece ativo enquanto o processo do app estiver vivo. 
 - O atalho de concluir tarefas na tela inicial agora executa a conclusão real.
 
 Observação: esta versão é uma atualização do código-fonte. Ainda precisa ser aberta e compilada no Android Studio e validada em aparelho. O pull-to-refresh e a execução confiável do timer em segundo plano permanecem pendentes de implementação e teste.
+
+
+## Identidade visual
+- `assets/focus_quest_capa.png`: capa de apresentação do Focus Quest.
+- Ícones de inicialização incluídos em `app/src/main/res/mipmap-*` e configurados no AndroidManifest.

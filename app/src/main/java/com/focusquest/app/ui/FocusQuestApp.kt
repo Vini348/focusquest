@@ -31,7 +31,7 @@ import com.focusquest.app.viewmodel.FocusViewModel
 
 
 private enum class Page(val label: String) {
-    HOME("Início"), TASKS("Tarefas"), JOURNEY("Jornada"), PROFILE("Perfil")
+    HOME("Início"), TASKS("Tarefas"), JOURNEY("Jornada"), PROFILE("Perfil"), BLOCKER("Bloqueio")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -47,6 +47,7 @@ fun FocusQuestApp(vm: FocusViewModel) {
         page = when (page) {
             Page.HOME -> Page.HOME
             Page.TASKS, Page.JOURNEY, Page.PROFILE -> Page.HOME
+            Page.BLOCKER -> Page.PROFILE
         }
     }
 
@@ -97,7 +98,7 @@ fun FocusQuestApp(vm: FocusViewModel) {
                     label = { Text("Jornada", maxLines = 1) }
                 )
                 NavigationBarItem(
-                    selected = page == Page.PROFILE,
+                    selected = page == Page.PROFILE || page == Page.BLOCKER,
                     onClick = { page = Page.PROFILE },
                     icon = { Icon(Icons.Default.Person, contentDescription = "Perfil") },
                     label = { Text("Perfil", maxLines = 1) }
@@ -137,7 +138,8 @@ fun FocusQuestApp(vm: FocusViewModel) {
                 Page.HOME -> DashboardScreen(tasks, xp, Modifier.fillMaxSize(), onNavigate = { page = it }, onComplete = { vm.completeTask(it) }, onRefresh = { vm.refreshTasks() })
                 Page.TASKS -> TasksScreen(tasks, vm, Modifier.fillMaxSize())
                 Page.JOURNEY -> FocusScreen(vm, xp, Modifier.fillMaxSize())
-                Page.PROFILE -> ProfileScreen(xp, Modifier.fillMaxSize())
+                Page.PROFILE -> ProfileScreen(xp, Modifier.fillMaxSize(), onOpenBlocker = { page = Page.BLOCKER })
+                Page.BLOCKER -> AppBlockerScreen(vm, onBack = { page = Page.PROFILE })
             }
         }
     }
@@ -513,7 +515,7 @@ private fun PermissionRow(title: String, granted: Boolean, onClick: () -> Unit) 
 }
 
 @Composable
-private fun ProfileScreen(xp: Int, modifier: Modifier = Modifier) {
+private fun ProfileScreen(xp: Int, modifier: Modifier = Modifier, onOpenBlocker: () -> Unit) {
     val level = xp / 500 + 1
     Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("SUA JORNADA", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
@@ -537,7 +539,8 @@ private fun ProfileScreen(xp: Int, modifier: Modifier = Modifier) {
                     headlineContent = { Text(title, fontWeight = FontWeight.SemiBold) },
                     supportingContent = { Text(subtitle) },
                     leadingContent = { Icon(icon, null, tint = MaterialTheme.colorScheme.primary) },
-                    trailingContent = { Icon(Icons.Default.ChevronRight, null) }
+                    trailingContent = { Icon(Icons.Default.ChevronRight, null) },
+                    modifier = if (title == "Configurações") Modifier.clickable { onOpenBlocker() } else Modifier
                 )
             }
         }
