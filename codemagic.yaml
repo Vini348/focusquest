@@ -1,0 +1,36 @@
+
+workflows:
+  focus-quest-android:
+    name: Focus Quest - Android Debug APK
+    max_build_duration: 60
+    instance_type: linux_x2
+
+    working_directory: FocusQuest
+
+    environment:
+      java: 17
+
+    scripts:
+      - name: Verificar estrutura do projeto
+        script: |
+          echo "Verificando arquivos do Focus Quest..."
+          ls -la
+          test -f gradlew
+          test -f settings.gradle.kts
+          test -f app/build.gradle.kts
+
+      - name: Configurar Android SDK
+        script: |
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
+
+      - name: Dar permissão ao Gradle
+        script: |
+          chmod +x ./gradlew
+
+      - name: Compilar Focus Quest
+        script: |
+          ./gradlew --no-daemon assembleDebug
+
+    artifacts:
+      - FocusQuest/app/build/outputs/apk/debug/*.apk
+      - FocusQuest/app/build/outputs/apk/debug/output-metadata.json
