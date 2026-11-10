@@ -1,4 +1,1 @@
-<resources>
-    <string name="app_name">Focus Quest</string>
-    <string name="focus_blocker_service_description">Identifica quando um aplicativo selecionado é aberto durante uma sessão de foco para exibir a tela de bloqueio do Focus Quest.</string>
-</resources>
+<resources><string name="app_name">Focus Quest</string></resources>

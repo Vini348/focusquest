@@ -77,3 +77,12 @@ Observação: esta versão é uma atualização do código-fonte. Ainda precisa 
 ## Identidade visual
 - `assets/focus_quest_capa.png`: capa de apresentação do Focus Quest.
 - Ícones de inicialização incluídos em `app/src/main/res/mipmap-*` e configurados no AndroidManifest.
+
+
+## Focus Quest v5 — Bloqueio com foco em privacidade
+- Removido o AccessibilityService e a declaração BIND_ACCESSIBILITY_SERVICE.
+- Monitoramento de primeiro plano com UsageStatsManager durante uma sessão iniciada pelo usuário.
+- Sobreposição de bloqueio com TYPE_APPLICATION_OVERLAY.
+- Permissões solicitadas: Acesso ao uso, Exibir sobre outros apps e serviço em primeiro plano (notificação persistente durante a sessão).
+- O monitor consulta eventos de primeiro plano localmente; não lê conteúdo das telas, mensagens, senhas ou notificações e não envia dados de uso para servidores.
+- O Android/Samsung pode aplicar atrasos ou limitações ao histórico de uso; portanto, esse método é menos imediato e não garante bloqueio inviolável.

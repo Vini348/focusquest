@@ -2,7 +2,6 @@ package com.focusquest.app.ui
 
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.provider.Settings
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,6 +20,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.focusquest.app.blocker.FocusBlockerPreferences
+import com.focusquest.app.permissions.PermissionHelper
 import com.focusquest.app.viewmodel.FocusViewModel
 
 private data class LaunchableApp(val label: String, val packageName: String)
@@ -30,7 +30,8 @@ fun AppBlockerScreen(vm: FocusViewModel, onBack: () -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val isTimerRunning by vm.isTimerRunning.collectAsState()
-    var serviceEnabled by remember { mutableStateOf(FocusBlockerPreferences.isAccessibilityServiceEnabled(context)) }
+    var usageEnabled by remember { mutableStateOf(PermissionHelper.hasUsageAccess(context)) }
+    var overlayEnabled by remember { mutableStateOf(PermissionHelper.hasOverlayAccess(context)) }
     val selectedPackages = remember {
         mutableStateListOf<String>().apply {
             addAll(FocusBlockerPreferences.getBlockedPackages(context))
@@ -55,7 +56,8 @@ fun AppBlockerScreen(vm: FocusViewModel, onBack: () -> Unit) {
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                serviceEnabled = FocusBlockerPreferences.isAccessibilityServiceEnabled(context)
+                usageEnabled = PermissionHelper.hasUsageAccess(context)
+                overlayEnabled = PermissionHelper.hasOverlayAccess(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -79,34 +81,57 @@ fun AppBlockerScreen(vm: FocusViewModel, onBack: () -> Unit) {
             }
         }
 
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Card {
             Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Security, tint = MaterialTheme.colorScheme.primary, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text(
-                        if (serviceEnabled) "Serviço de acessibilidade ativado" else "Permissão necessária",
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text("Privacidade em primeiro lugar", fontWeight = FontWeight.Bold)
                 }
                 Text(
-                    if (serviceEnabled)
-                        "O Focus Quest pode identificar os aplicativos selecionados enquanto uma sessão de foco estiver ativa."
-                    else
-                        "Ative o serviço do Focus Quest nas configurações de Acessibilidade do Android para permitir o bloqueio.",
+                    "O Focus Quest usa o Acesso ao uso para identificar somente qual aplicativo está em primeiro plano. Ele não lê mensagens, senhas, textos, telas ou notificações e não envia esse histórico para servidores.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall
                 )
-                Button(
-                    onClick = { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(if (serviceEnabled) "Abrir configurações de acessibilidade" else "Ativar acessibilidade")
-                }
+                Text(
+                    "A permissão de sobreposição é usada apenas para mostrar a tela de foco sobre um aplicativo selecionado.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
         }
 
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Card {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("1. Acesso ao uso", fontWeight = FontWeight.Bold)
+                Text(
+                    if (usageEnabled) "Permissão ativada" else "Permissão ainda não concedida",
+                    color = if (usageEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                )
+                Text("Necessário para detectar qual aplicativo está aberto durante a sessão de foco.", style = MaterialTheme.typography.bodySmall)
+                Button(
+                    onClick = { context.startActivity(PermissionHelper.usageAccessIntent(context)) },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text(if (usageEnabled) "Revisar acesso ao uso" else "Conceder acesso ao uso") }
+            }
+        }
+
+        Card {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("2. Sobreposição", fontWeight = FontWeight.Bold)
+                Text(
+                    if (overlayEnabled) "Permissão ativada" else "Permissão ainda não concedida",
+                    color = if (overlayEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                )
+                Text("Necessária para exibir a tela de bloqueio por cima do aplicativo selecionado.", style = MaterialTheme.typography.bodySmall)
+                Button(
+                    onClick = { context.startActivity(PermissionHelper.overlayIntent(context)) },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text(if (overlayEnabled) "Revisar sobreposição" else "Permitir sobreposição") }
+            }
+        }
+
+        Card {
             Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     if (isTimerRunning) "Sessão de foco em andamento" else "Bloqueio aguardando uma sessão",
@@ -114,14 +139,17 @@ fun AppBlockerScreen(vm: FocusViewModel, onBack: () -> Unit) {
                     color = if (isTimerRunning) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    "Os aplicativos selecionados só serão bloqueados enquanto o cronômetro de foco estiver ativo. Pausar ou encerrar a sessão libera os aplicativos.",
+                    "O monitoramento funciona somente durante uma sessão iniciada por você. Pausar ou encerrar a sessão interrompe o monitoramento e remove a tela de bloqueio.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (!usageEnabled || !overlayEnabled) {
+                    Text("Para bloquear aplicativos, conceda as duas permissões acima.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
             }
         }
 
-        Text("Escolha os aplicativos que deseja bloquear", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text("Aplicativos que deseja bloquear", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         Text("${selectedPackages.size} selecionado(s)", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
 
         if (apps.isEmpty()) {
@@ -142,9 +170,7 @@ fun AppBlockerScreen(vm: FocusViewModel, onBack: () -> Unit) {
                                 onCheckedChange = { value ->
                                     if (value) {
                                         if (app.packageName !in selectedPackages) selectedPackages.add(app.packageName)
-                                    } else {
-                                        selectedPackages.remove(app.packageName)
-                                    }
+                                    } else selectedPackages.remove(app.packageName)
                                     persistSelection()
                                 }
                             )

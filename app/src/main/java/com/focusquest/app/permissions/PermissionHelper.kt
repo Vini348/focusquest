@@ -1,26 +1,17 @@
 package com.focusquest.app.permissions
 
-import android.app.AppOpsManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Process
 import android.provider.Settings
+import com.focusquest.app.blocker.FocusBlockerPreferences
 
 object PermissionHelper {
-    fun hasUsageAccess(context: Context): Boolean {
-        val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
-        @Suppress("DEPRECATION")
-        val mode = appOps.checkOpNoThrow(
-            AppOpsManager.OPSTR_GET_USAGE_STATS,
-            Process.myUid(),
-            context.packageName
-        )
-        return mode == AppOpsManager.MODE_ALLOWED
-    }
+    fun hasUsageAccess(context: Context): Boolean =
+        FocusBlockerPreferences.hasUsageAccess(context)
 
     fun hasOverlayAccess(context: Context): Boolean =
-        Settings.canDrawOverlays(context)
+        FocusBlockerPreferences.hasOverlayAccess(context)
 
     fun usageAccessIntent(context: Context): Intent =
         Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).apply {

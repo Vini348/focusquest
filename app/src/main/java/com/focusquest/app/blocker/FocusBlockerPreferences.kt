@@ -1,11 +1,9 @@
 package com.focusquest.app.blocker
 
-import android.accessibilityservice.AccessibilityServiceInfo
-import android.content.ComponentName
+import android.app.AppOpsManager
 import android.content.Context
+import android.os.Process
 import android.provider.Settings
-import android.text.TextUtils
-import com.focusquest.app.blocker.FocusAccessibilityService
 
 object FocusBlockerPreferences {
     private const val PREFS = "focus_blocker_preferences"
@@ -37,19 +35,19 @@ object FocusBlockerPreferences {
             .apply()
     }
 
-    fun isAccessibilityServiceEnabled(context: Context): Boolean {
-        val expected = ComponentName(context, FocusAccessibilityService::class.java)
-        val enabled = Settings.Secure.getString(
-            context.contentResolver,
-            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-        ) ?: return false
-
-        val splitter = TextUtils.SimpleStringSplitter(':')
-        splitter.setString(enabled)
-        while (splitter.hasNext()) {
-            val component = ComponentName.unflattenFromString(splitter.next())
-            if (component == expected) return true
-        }
-        return false
+    fun hasUsageAccess(context: Context): Boolean {
+        val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+        @Suppress("DEPRECATION")
+        val mode = appOps.checkOpNoThrow(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            Process.myUid(),
+            context.packageName
+        )
+        return mode == AppOpsManager.MODE_ALLOWED
     }
+
+    fun hasOverlayAccess(context: Context): Boolean = Settings.canDrawOverlays(context)
+
+    fun hasRequiredPermissions(context: Context): Boolean =
+        hasUsageAccess(context) && hasOverlayAccess(context)
 }

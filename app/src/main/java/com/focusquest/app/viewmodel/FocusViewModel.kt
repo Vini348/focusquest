@@ -7,6 +7,7 @@ import com.focusquest.app.data.FocusDatabase
 import com.focusquest.app.data.TaskEntity
 import com.focusquest.app.data.TaskRepository
 import com.focusquest.app.blocker.FocusBlockerPreferences
+import com.focusquest.app.blocker.UsageAccessBlockerService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,6 +62,7 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
         endAtMillis = System.currentTimeMillis() + _remainingMillis.value
         _isTimerRunning.value = true
         FocusBlockerPreferences.setFocusActive(getApplication(), true, endAtMillis)
+        UsageAccessBlockerService.start(getApplication())
         timerJob?.cancel()
         timerJob = viewModelScope.launch {
             while (_isTimerRunning.value) {
@@ -69,6 +71,7 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
                 if (left == 0L) {
                     _isTimerRunning.value = false
                     FocusBlockerPreferences.setFocusActive(getApplication(), false)
+                    UsageAccessBlockerService.stop(getApplication())
                     val minutes = _selectedMinutes.value
                     repository.addFocusSession(minutes)
                     _lastSessionXp.value = minutes * 2
@@ -84,6 +87,7 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
         _remainingMillis.value = (endAtMillis - System.currentTimeMillis()).coerceAtLeast(0L)
         _isTimerRunning.value = false
         FocusBlockerPreferences.setFocusActive(getApplication(), false)
+        UsageAccessBlockerService.stop(getApplication())
         timerJob?.cancel()
     }
 
@@ -91,6 +95,7 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
         timerJob?.cancel()
         _isTimerRunning.value = false
         FocusBlockerPreferences.setFocusActive(getApplication(), false)
+        UsageAccessBlockerService.stop(getApplication())
         _remainingMillis.value = _selectedMinutes.value * 60_000L
         _lastSessionXp.value = null
     }
@@ -101,6 +106,8 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
 
     override fun onCleared() {
         FocusBlockerPreferences.setFocusActive(getApplication(), false)
+        UsageAccessBlockerService.stop(getApplication())
+        UsageAccessBlockerService.stop(getApplication())
         timerJob?.cancel()
         super.onCleared()
     }
