@@ -21,6 +21,9 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
 
     val tasks = repository.tasks.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val totalXp = repository.totalXp.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+    val goals = repository.goals.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val habits = repository.habits.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val notes = repository.notes.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _selectedMinutes = MutableStateFlow(25)
     val selectedMinutes = _selectedMinutes.asStateFlow()
@@ -36,10 +39,26 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
 
     suspend fun refreshTasks() { repository.refresh() }
 
-    fun addTask(title: String, description: String, priority: String) {
+    fun addTask(title: String, description: String, priority: String, category: String = "Pessoal", dueDate: String? = null, goalId: Long? = null) {
         if (title.isBlank()) return
-        viewModelScope.launch { repository.add(title.trim(), description.trim(), priority) }
+        viewModelScope.launch { repository.add(title.trim(), description.trim(), priority, category, dueDate, goalId) }
     }
+
+    fun addGoal(title: String, description: String, horizon: String, targetDate: String?) {
+        if (title.isBlank()) return
+        viewModelScope.launch { repository.addGoal(title.trim(), description.trim(), horizon, targetDate) }
+    }
+    fun completeGoal(id: Long, completed: Boolean) { viewModelScope.launch { repository.completeGoal(id, completed) } }
+    fun deleteGoal(id: Long) { viewModelScope.launch { repository.deleteGoal(id) } }
+    fun addHabit(title: String, frequency: String) { if (title.isNotBlank()) viewModelScope.launch { repository.addHabit(title.trim(), frequency) } }
+    fun completeHabit(habit: com.focusquest.app.data.HabitEntity) { viewModelScope.launch { repository.completeHabit(habit) } }
+    fun archiveHabit(id: Long) { viewModelScope.launch { repository.archiveHabit(id) } }
+    fun saveNote(id: Long?, title: String, content: String) { if (title.isNotBlank()) viewModelScope.launch { repository.saveNote(id, title.trim(), content.trim()) } }
+    fun deleteNote(id: Long) { viewModelScope.launch { repository.deleteNote(id) } }
+    fun subtasks(taskId: Long) = repository.subtasks(taskId)
+    fun addSubtask(taskId: Long, title: String) { if (title.isNotBlank()) viewModelScope.launch { repository.addSubtask(taskId, title.trim()) } }
+    fun completeSubtask(id: Long, completed: Boolean) { viewModelScope.launch { repository.completeSubtask(id, completed) } }
+    fun deleteSubtask(id: Long) { viewModelScope.launch { repository.deleteSubtask(id) } }
 
     fun completeTask(task: TaskEntity) {
         viewModelScope.launch { repository.complete(task.id) }

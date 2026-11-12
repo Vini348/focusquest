@@ -31,7 +31,7 @@ import com.focusquest.app.viewmodel.FocusViewModel
 
 
 private enum class Page(val label: String) {
-    HOME("Início"), TASKS("Tarefas"), JOURNEY("Jornada"), PROFILE("Perfil"), BLOCKER("Bloqueio")
+    HOME("Início"), TASKS("Tarefas"), JOURNEY("Jornada"), PROFILE("Perfil"), BLOCKER("Bloqueio"), PLANNER("Planejamento")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -41,6 +41,7 @@ fun FocusQuestApp(vm: FocusViewModel) {
     var showCreateMenu by remember { mutableStateOf(false) }
     var showAddTask by remember { mutableStateOf(false) }
     val tasks by vm.tasks.collectAsStateWithLifecycle()
+    val goals by vm.goals.collectAsStateWithLifecycle()
     val xp by vm.totalXp.collectAsStateWithLifecycle()
 
     fun goBack() {
@@ -48,6 +49,7 @@ fun FocusQuestApp(vm: FocusViewModel) {
             Page.HOME -> Page.HOME
             Page.TASKS, Page.JOURNEY, Page.PROFILE -> Page.HOME
             Page.BLOCKER -> Page.PROFILE
+            Page.PLANNER -> Page.TASKS
         }
     }
 
@@ -136,10 +138,11 @@ fun FocusQuestApp(vm: FocusViewModel) {
         ) {
             when (page) {
                 Page.HOME -> DashboardScreen(tasks, xp, Modifier.fillMaxSize(), onNavigate = { page = it }, onComplete = { vm.completeTask(it) }, onRefresh = { vm.refreshTasks() })
-                Page.TASKS -> TasksScreen(tasks, vm, Modifier.fillMaxSize())
+                Page.TASKS -> TasksScreen(tasks, vm, Modifier.fillMaxSize(), onOpenPlanner = { page = Page.PLANNER })
                 Page.JOURNEY -> FocusScreen(vm, xp, Modifier.fillMaxSize())
-                Page.PROFILE -> ProfileScreen(xp, Modifier.fillMaxSize(), onOpenBlocker = { page = Page.BLOCKER })
+                Page.PROFILE -> ProfileScreen(xp, Modifier.fillMaxSize(), onOpenBlocker = { page = Page.BLOCKER }, onOpenPlanner = { page = Page.PLANNER })
                 Page.BLOCKER -> AppBlockerScreen(vm, onBack = { page = Page.PROFILE })
+                Page.PLANNER -> ProductivityHubScreen(vm, onBack = { page = Page.TASKS })
             }
         }
     }
@@ -161,6 +164,12 @@ fun FocusQuestApp(vm: FocusViewModel) {
                     modifier = Modifier.clickable { showCreateMenu = false; page = Page.JOURNEY }
                 )
                 ListItem(
+                    headlineContent = { Text("Planejamento") },
+                    supportingContent = { Text("Metas, hábitos, notas e calendário") },
+                    leadingContent = { Icon(Icons.Default.CalendarMonth, null) },
+                    modifier = Modifier.clickable { showCreateMenu = false; page = Page.PLANNER }
+                )
+                ListItem(
                     headlineContent = { Text("Ver tarefas") },
                     supportingContent = { Text("Organize suas missões cadastradas") },
                     leadingContent = { Icon(Icons.Default.Flag, null) },
@@ -171,8 +180,8 @@ fun FocusQuestApp(vm: FocusViewModel) {
     }
 
     if (showAddTask) {
-        AddTaskDialog(onDismiss = { showAddTask = false }, onSave = { title, desc, priority ->
-            vm.addTask(title, desc, priority)
+        AddTaskDialog(goals = goals, onDismiss = { showAddTask = false }, onSave = { title, desc, priority, category, dueDate, goalId ->
+            vm.addTask(title, desc, priority, category, dueDate, goalId)
             showAddTask = false
         })
     }
@@ -259,9 +268,16 @@ private fun MetricCard(label: String, value: String, modifier: Modifier = Modifi
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TasksScreen(tasks: List<TaskEntity>, vm: FocusViewModel, modifier: Modifier = Modifier) {
+private fun TasksScreen(tasks: List<TaskEntity>, vm: FocusViewModel, modifier: Modifier = Modifier, onOpenPlanner: () -> Unit) {
     var showDialog by remember { mutableStateOf(false) }
     var refreshing by remember { mutableStateOf(false) }
+    var search by remember { mutableStateOf("") }
+    var filter by remember { mutableStateOf("Todas") }
+    val visibleTasks = tasks.filter { task ->
+        val matchesText = task.title.contains(search, ignoreCase = true) || task.description.contains(search, ignoreCase = true) || task.category.contains(search, ignoreCase = true)
+        val matchesFilter = when (filter) { "Pendentes" -> !task.isCompleted; "Concluídas" -> task.isCompleted; "Atrasadas" -> !task.isCompleted && task.dueDate != null && task.dueDate < java.time.LocalDate.now().toString(); else -> true }
+        matchesText && matchesFilter
+    }
     val scope = rememberCoroutineScope()
     Column(modifier.fillMaxSize().padding(horizontal = 20.dp)) {
         Spacer(Modifier.height(20.dp))
@@ -270,9 +286,18 @@ private fun TasksScreen(tasks: List<TaskEntity>, vm: FocusViewModel, modifier: M
                 Text("SUAS MISSÕES", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                 Text("Tarefas", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
             }
-            FilledTonalIconButton(onClick = { showDialog = true }) { Icon(Icons.Default.Add, "Adicionar tarefa") }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilledTonalIconButton(onClick = onOpenPlanner) { Icon(Icons.Default.CalendarMonth, "Planejamento") }
+                FilledTonalIconButton(onClick = { showDialog = true }) { Icon(Icons.Default.Add, "Adicionar tarefa") }
+            }
         }
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(12.dp))
+        OutlinedTextField(search, { search = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text("Buscar missões...") }, leadingIcon = { Icon(Icons.Default.Search, null) })
+        Spacer(Modifier.height(6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf("Todas", "Pendentes", "Concluídas", "Atrasadas").forEach { value -> FilterChip(selected = filter == value, onClick = { filter = value }, label = { Text(value) }) }
+        }
+        Spacer(Modifier.height(8.dp))
         PullToRefreshBox(
             isRefreshing = refreshing,
             onRefresh = {
@@ -284,9 +309,9 @@ private fun TasksScreen(tasks: List<TaskEntity>, vm: FocusViewModel, modifier: M
             },
             modifier = Modifier.weight(1f).fillMaxWidth()
         ) {
-            if (tasks.isEmpty()) {
+            if (visibleTasks.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-                    EmptyState("Sua lista está vazia", "Puxe a tela para atualizar ou crie uma missão.")
+                    EmptyState(if (tasks.isEmpty()) "Sua lista está vazia" else "Nenhuma missão encontrada", if (tasks.isEmpty()) "Crie uma missão ou use o planejamento para organizar suas metas." else "Altere a busca ou o filtro selecionado.")
                 }
             } else {
                 LazyColumn(
@@ -294,15 +319,15 @@ private fun TasksScreen(tasks: List<TaskEntity>, vm: FocusViewModel, modifier: M
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     contentPadding = PaddingValues(bottom = 20.dp)
                 ) {
-                    items(tasks, key = { it.id }) { task ->
-                        TaskRow(task, onComplete = { vm.completeTask(task) }, onDelete = { vm.deleteTask(task) })
+                    items(visibleTasks, key = { it.id }) { task ->
+                        TaskRowWithSubtasks(task, vm, onComplete = { vm.completeTask(task) }, onDelete = { vm.deleteTask(task) })
                     }
                 }
             }
         }
     }
-    if (showDialog) AddTaskDialog(onDismiss = { showDialog = false }, onSave = { title, desc, priority ->
-        vm.addTask(title, desc, priority)
+    if (showDialog) AddTaskDialog(goals = vm.goals.collectAsStateWithLifecycle().value, onDismiss = { showDialog = false }, onSave = { title, desc, priority, category, dueDate, goalId ->
+        vm.addTask(title, desc, priority, category, dueDate, goalId)
         showDialog = false
     })
 }
@@ -324,7 +349,7 @@ private fun TaskRow(task: TaskEntity, onComplete: () -> Unit, onDelete: () -> Un
             }
             Column(Modifier.weight(1f)) {
                 Text(task.title, fontWeight = FontWeight.SemiBold, color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
-                Text("${task.priority} • ${task.xp} XP", color = priorityColor, style = MaterialTheme.typography.labelSmall)
+                Text("${task.priority} • ${task.category} • ${task.xp} XP${task.dueDate?.let { " • $it" } ?: ""}", color = priorityColor, style = MaterialTheme.typography.labelSmall)
                 if (task.description.isNotBlank()) Text(task.description, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             }
             if (!task.isCompleted) IconButton(onClick = onDelete) { Icon(Icons.Default.DeleteOutline, "Excluir", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -333,17 +358,33 @@ private fun TaskRow(task: TaskEntity, onComplete: () -> Unit, onDelete: () -> Un
 }
 
 @Composable
-private fun AddTaskDialog(onDismiss: () -> Unit, onSave: (String, String, String) -> Unit) {
+private fun AddTaskDialog(goals: List<com.focusquest.app.data.GoalEntity>, onDismiss: () -> Unit, onSave: (String, String, String, String, String?, Long?) -> Unit) {
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var priority by remember { mutableStateOf("Média") }
+    var category by remember { mutableStateOf("Pessoal") }
+    var dueDate by remember { mutableStateOf("") }
+    var selectedGoalId by remember { mutableStateOf<Long?>(null) }
+    val validDate = dueDate.isBlank() || runCatching { java.time.LocalDate.parse(dueDate) }.isSuccess
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Nova missão") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 OutlinedTextField(title, { title = it }, label = { Text("Nome da atividade") }, singleLine = true)
                 OutlinedTextField(description, { description = it }, label = { Text("Descrição (opcional)") })
+                Text("Categoria", fontWeight = FontWeight.SemiBold)
+                Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    listOf("Pessoal", "Estudos", "Trabalho", "Saúde").forEach { FilterChip(selected = category == it, onClick = { category = it }, label = { Text(it, style = MaterialTheme.typography.labelSmall) }) }
+                }
+                OutlinedTextField(dueDate, { dueDate = it }, label = { Text("Prazo (AAAA-MM-DD, opcional)") }, singleLine = true, isError = !validDate, supportingText = { if (!validDate) Text("Use uma data válida, como 2026-11-20") })
+                if (goals.isNotEmpty()) {
+                    Text("Vincular a uma meta", fontWeight = FontWeight.SemiBold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        FilterChip(selected = selectedGoalId == null, onClick = { selectedGoalId = null }, label = { Text("Nenhuma") })
+                        goals.filter { !it.isCompleted }.take(3).forEach { goal -> FilterChip(selected = selectedGoalId == goal.id, onClick = { selectedGoalId = goal.id }, label = { Text(goal.title, maxLines = 1) }) }
+                    }
+                }
                 Text("Prioridade", fontWeight = FontWeight.SemiBold)
                 listOf("Crítica", "Alta", "Média", "Baixa").forEach {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -353,9 +394,49 @@ private fun AddTaskDialog(onDismiss: () -> Unit, onSave: (String, String, String
                 }
             }
         },
-        confirmButton = { Button(onClick = { onSave(title, description, priority) }, enabled = title.isNotBlank()) { Text("Salvar missão") } },
+        confirmButton = { Button(onClick = { onSave(title, description, priority, category, dueDate.takeIf { it.isNotBlank() }, selectedGoalId) }, enabled = title.isNotBlank() && validDate) { Text("Salvar missão") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
     )
+}
+
+@Composable
+private fun TaskRowWithSubtasks(task: TaskEntity, vm: FocusViewModel, onComplete: () -> Unit, onDelete: () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    var showAdd by remember { mutableStateOf(false) }
+    var subtaskTitle by remember { mutableStateOf("") }
+    val subtasks by vm.subtasks(task.id).collectAsStateWithLifecycle(initialValue = emptyList())
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(18.dp)) {
+        Column(Modifier.fillMaxWidth().padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (!task.isCompleted) Checkbox(checked = false, onCheckedChange = { onComplete() })
+                else Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(task.title, fontWeight = FontWeight.SemiBold, color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
+                    Text("${task.priority} • ${task.category} • ${task.xp} XP${task.dueDate?.let { " • $it" } ?: ""}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
+                    if (task.description.isNotBlank()) Text(task.description, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                }
+                IconButton(onClick = { expanded = !expanded }) { Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.SubdirectoryArrowRight, "Subtarefas") }
+                if (!task.isCompleted) IconButton(onClick = onDelete) { Icon(Icons.Default.DeleteOutline, "Excluir", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
+            if (expanded) {
+                Divider(color = MaterialTheme.colorScheme.outlineVariant)
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Etapas", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    Text("${subtasks.count { it.isCompleted }}/${subtasks.size}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
+                    TextButton(onClick = { showAdd = true }) { Icon(Icons.Default.Add, null); Text("Adicionar") }
+                }
+                subtasks.forEach { sub ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = sub.isCompleted, onCheckedChange = { vm.completeSubtask(sub.id, it) })
+                        Text(sub.title, modifier = Modifier.weight(1f), color = if (sub.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
+                        IconButton(onClick = { vm.deleteSubtask(sub.id) }) { Icon(Icons.Default.Close, "Remover etapa") }
+                    }
+                }
+                if (subtasks.isNotEmpty()) LinearProgressIndicator(progress = { subtasks.count { it.isCompleted }.toFloat() / subtasks.size }, modifier = Modifier.fillMaxWidth())
+            }
+        }
+    }
+    if (showAdd) AlertDialog(onDismissRequest = { showAdd = false; subtaskTitle = "" }, title = { Text("Nova etapa") }, text = { OutlinedTextField(subtaskTitle, { subtaskTitle = it }, label = { Text("O que precisa ser feito?") }, singleLine = true) }, confirmButton = { Button(enabled = subtaskTitle.isNotBlank(), onClick = { vm.addSubtask(task.id, subtaskTitle); subtaskTitle = ""; showAdd = false }) { Text("Adicionar") } }, dismissButton = { TextButton(onClick = { showAdd = false }) { Text("Cancelar") } })
 }
 
 
@@ -515,7 +596,7 @@ private fun PermissionRow(title: String, granted: Boolean, onClick: () -> Unit) 
 }
 
 @Composable
-private fun ProfileScreen(xp: Int, modifier: Modifier = Modifier, onOpenBlocker: () -> Unit) {
+private fun ProfileScreen(xp: Int, modifier: Modifier = Modifier, onOpenBlocker: () -> Unit, onOpenPlanner: () -> Unit) {
     val level = xp / 500 + 1
     Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("SUA JORNADA", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
@@ -528,6 +609,9 @@ private fun ProfileScreen(xp: Int, modifier: Modifier = Modifier, onOpenBlocker:
             }
         }
         Text("Sua conta e ferramentas", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(16.dp)) {
+            ListItem(headlineContent = { Text("Planejamento", fontWeight = FontWeight.SemiBold) }, supportingContent = { Text("Metas, hábitos, notas e calendário") }, leadingContent = { Icon(Icons.Default.CalendarMonth, null, tint = MaterialTheme.colorScheme.primary) }, trailingContent = { Icon(Icons.Default.ChevronRight, null) }, modifier = Modifier.clickable { onOpenPlanner() })
+        }
         listOf(
             Triple(Icons.Default.QueryStats, "Estatísticas", "Seu desempenho e evolução"),
             Triple(Icons.Default.History, "Histórico", "Sessões de foco e tarefas concluídas"),

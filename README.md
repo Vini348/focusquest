@@ -86,3 +86,26 @@ Observação: esta versão é uma atualização do código-fonte. Ainda precisa 
 - Permissões solicitadas: Acesso ao uso, Exibir sobre outros apps e serviço em primeiro plano (notificação persistente durante a sessão).
 - O monitor consulta eventos de primeiro plano localmente; não lê conteúdo das telas, mensagens, senhas ou notificações e não envia dados de uso para servidores.
 - O Android/Samsung pode aplicar atrasos ou limitações ao histórico de uso; portanto, esse método é menos imediato e não garante bloqueio inviolável.
+
+
+## Ícone e capa oficiais
+- `assets/focus_quest_capa.png`: imagem original enviada para a capa do Focus Quest.
+- `app/src/main/res/mipmap-*`: ícones de inicialização derivados do logotipo quadrado da imagem.
+- O `AndroidManifest.xml` referencia `@mipmap/ic_launcher` e `@mipmap/ic_launcher_round`.
+
+
+## Focus Quest 0.2.0 — Etapa 1: Organização e produtividade
+
+Esta atualização amplia a base local do aplicativo com:
+- Metas com descrição, horizonte (curto, médio ou longo prazo), prazo opcional e conclusão manual.
+- Vínculo de tarefas a metas e indicador de progresso baseado nas tarefas vinculadas.
+- Categorias de tarefas, prazos em formato AAAA-MM-DD, busca e filtros por status/atraso.
+- Subtarefas com conclusão individual e barra de progresso por missão.
+- Hábitos diários, em dias úteis ou semanais, com registro de conclusão e sequência.
+- Notas rápidas com criação, edição e exclusão.
+- Calendário/agenda agrupando as tarefas por prazo.
+- Migração Room da versão 2 para 3, preservando os dados existentes.
+
+A interface de planejamento é acessada pelo botão de calendário na tela Tarefas, pelo menu Criar ou pelo Perfil. A tela de calendário usa as datas informadas nas tarefas. Nesta entrega, os prazos são informados no formato ISO `AAAA-MM-DD`; a seleção visual por calendário poderá ser refinada numa próxima iteração.
+
+**Validação:** o código-fonte foi atualizado e revisado estruturalmente, mas ainda precisa passar pelo build do Codemagic e por testes no dispositivo.

@@ -2,6 +2,7 @@ package com.focusquest.app.data
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import androidx.room.ColumnInfo
 
 @Entity(tableName = "tasks")
 data class TaskEntity(
@@ -12,5 +13,8 @@ data class TaskEntity(
     val xp: Int = 25,
     val isCompleted: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
-    val completedAt: Long? = null
+    val completedAt: Long? = null,
+    @ColumnInfo(defaultValue = "'Pessoal'") val category: String = "Pessoal",
+    val dueDate: String? = null,
+    val goalId: Long? = null
 )
